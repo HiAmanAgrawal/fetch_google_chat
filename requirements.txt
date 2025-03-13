@@ -6,4 +6,4 @@ transformers
 torch
 nltk
 python-dotenv
-dateutil
+python-dateutil
