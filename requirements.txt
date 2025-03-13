@@ -1,0 +1,9 @@
+Flask
+google-auth-oauthlib
+google-auth
+google-api-python-client
+transformers
+torch
+nltk
+python-dotenv
+dateutil
