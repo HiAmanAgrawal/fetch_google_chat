@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 import re
 import nltk
@@ -39,7 +38,6 @@ class ChatIssueDetector:
     ]
 
     def __init__(self):
-        self.creds = None
         self.service = None
         self.model_name = os.getenv("MODEL_NAME")
         self.model_revision = os.getenv("MODEL_REVISION")
@@ -48,11 +46,8 @@ class ChatIssueDetector:
         self.client_secret_file = "client_secret.json"
         self.save_client_secret()
 
-        # Initialize sentiment analysis pipeline
+        # ✅ Initialize sentiment analysis pipeline
         self.model = pipeline("sentiment-analysis", model=self.model_name, revision=self.model_revision)
-
-        # Authenticate
-        self.authenticate_user()
 
     def save_client_secret(self):
         """Decode base64 client_secret.json and save it to a file."""
@@ -65,12 +60,15 @@ class ChatIssueDetector:
             f.write(decoded_json)
         print("✅ client_secret.json saved successfully.")
 
-    def authenticate_user(self):
-        """Authenticate user using OAuth 2.0."""
-        flow = InstalledAppFlow.from_client_secrets_file(self.client_secret_file, self.SCOPES)
-        self.creds = flow.run_local_server(port=0)
+    def authenticate_user(self, token):
+        """Authenticate user using the OAuth token from the Authorization header."""
+        if not token:
+            raise ValueError("❌ No OAuth token provided in the request.")
+
+        # ✅ Create credentials from token
+        self.creds = Credentials(token)
         self.service = build("chat", "v1", credentials=self.creds)
-        print("✅ Authentication successful.")
+        print("✅ Authentication successful using OAuth token.")
 
     def detect_issue(self, text):
         """Checks if a message contains issue-related keywords or negative sentiment."""
@@ -90,8 +88,11 @@ class ChatIssueDetector:
             print(f"❌ Sentiment Analysis Error: {e}")
             return False
 
-    def get_messages(self, space_id, hours_ago=1):
+    def get_messages(self, space_id, token, hours_ago=1):
         """Retrieve and analyze messages from Google Chat Space."""
+        # ✅ Authenticate using the provided OAuth token
+        self.authenticate_user(token)
+
         space_name = f"spaces/{space_id}"
         now = datetime.utcnow()
         time_threshold = now - timedelta(hours=hours_ago)
@@ -129,12 +130,19 @@ def fetch_messages():
     if not space_id:
         return jsonify({"error": "Missing space_id parameter"}), 400
 
+    # ✅ Extract token from Authorization header
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Missing or invalid Authorization header"}), 401
+
+    token = auth_header.split("Bearer ")[1]
+
     hours_ago = int(request.args.get("hours_ago", 1))
-    messages = detector.get_messages(space_id, hours_ago)
+    messages = detector.get_messages(space_id, token, hours_ago)
     return jsonify(messages)
 
 
 if __name__ == "__main__":
     from os import environ
 
-    app.run(host="0.0.0.0", port=int(environ.get("PORT", 5000)), debug=True)
+    app.run(host="0.0.0.0", port=int(environ.get("PORT", 3232)), debug=True)
