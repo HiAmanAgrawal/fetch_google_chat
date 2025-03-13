@@ -12,6 +12,8 @@ from datetime import datetime, timedelta
 from transformers import pipeline
 from dateutil.parser import parse
 from dotenv import load_dotenv
+import base64
+import json
 
 # ✅ Load environment variables
 load_dotenv()
@@ -37,17 +39,31 @@ class ChatIssueDetector:
     ]
 
     def __init__(self):
-        self.client_secret_file = os.getenv("CLIENT_SECRET_FILE")
-        self.model_name = os.getenv("MODEL_NAME")
-        self.model_revision = os.getenv("MODEL_REVISION")
         self.creds = None
         self.service = None
+        self.model_name = os.getenv("MODEL_NAME")
+        self.model_revision = os.getenv("MODEL_REVISION")
+
+        # ✅ Decode client_secret.json from env variable and save it
+        self.client_secret_file = "client_secret.json"
+        self.save_client_secret()
 
         # Initialize sentiment analysis pipeline
         self.model = pipeline("sentiment-analysis", model=self.model_name, revision=self.model_revision)
 
         # Authenticate
         self.authenticate_user()
+
+    def save_client_secret(self):
+        """Decode base64 client_secret.json and save it to a file."""
+        encoded_json = os.getenv("CLIENT_SECRET_JSON")
+        if not encoded_json:
+            raise ValueError("CLIENT_SECRET_JSON not set in environment variables")
+
+        decoded_json = base64.b64decode(encoded_json).decode("utf-8")
+        with open(self.client_secret_file, "w") as f:
+            f.write(decoded_json)
+        print("✅ client_secret.json saved successfully.")
 
     def authenticate_user(self):
         """Authenticate user using OAuth 2.0."""
